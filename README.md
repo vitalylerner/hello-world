@@ -1,13 +1,21 @@
-# Welcome to GitHub
+# Simulation of ChR2 neurons in coronal slices
 
-Welcome to GitHub—where millions of developers work together on software. Ready to get started? Let’s learn how this all works by building and publishing your first GitHub Pages website!
 
-## Repositories
 
-Right now, we’re in your first GitHub **repository**. A repository is like a folder or storage space for your project. Your project's repository contains all its files such as code, documentation, images, and more. It also tracks every change that you—or your collaborators—make to each file, so you can always go back to previous versions of your project if you make any mistakes.
+## Slices geometry
 
-This repository contains three important files: The HTML code for your first website on GitHub, the CSS stylesheet that decorates your website with colors and fonts, and the **README** file. It also contains an image folder, with one image file.
-
+the slices are coronal, from the right hemisphere
+    the coordinates are experiment-oriented
+<ul>
+    <li>z: rostral-caudal, z=0 is the top surface of the slice,
+        i.e. nose --> 0um ---300um -->  tail
+    <li>y: dorsal-ventral, y=0 is the pia, i.e.
+        dura --> pia=0um --->900um --> white matter
+    <li>x: arbitrary coordinate orthogonal to (y,z) such that approsimately
+       x axis is parallel to a local line of pia and wm 
+       approximately right to left
+</ul>
+<!--
 ## Describe your project
 
 You are currently viewing your project's **README** file. **_README_** files are like cover pages or elevator pitches for your project. They are written in plain text or [Markdown language](https://guides.github.com/features/mastering-markdown/), and usually include a paragraph describing the project, directions on how to use it, who authored it, and more.
@@ -88,3 +96,4 @@ Want to add even more code and fun styles to your GitHub Pages website? [Follow 
 ## Everything you need to know about GitHub
 
 Getting started is the hardest part. If there’s anything you’d like to know as you get started with GitHub, try searching [GitHub Help](https://help.github.com). Our documentation has tutorials on everything from changing your repository settings to configuring GitHub from your command line.
+-->
