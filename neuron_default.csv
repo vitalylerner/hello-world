@@ -1,8 +1,0 @@
-name,datatype,units,value
-ChR2,bool,none,True
-ChR2_level,real,none,0.8
-tau,real,ms,50
-R,real,MOhm,250
-soma_z,real,um,50
-soma_x,real,um,0
-soma_y,real,um,650
