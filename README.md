@@ -8,13 +8,21 @@ the slices are coronal, from the right hemisphere
     the coordinates are experiment-oriented
 <ul>
     <li>z: rostral-caudal, z=0 is the top surface of the slice,
-        i.e. nose --> 0um ---300um -->  tail
+        i.e. nose --> 0um --> 300um -->  tail
     <li>y: dorsal-ventral, y=0 is the pia, i.e.
         dura --> pia=0um --->900um --> white matter
     <li>x: arbitrary coordinate orthogonal to (y,z) such that approsimately
        x axis is parallel to a local line of pia and wm 
        approximately right to left
 </ul>
+##
+Stimulation geometry
+the stimulus is a map of spots
+
+## Channelrhodopisn expressing neurons
+Integrate and fire with respect to the location of the response
+## ChR- neurons
+
 <!--
 ## Describe your project
 
