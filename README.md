@@ -23,7 +23,7 @@ Integrate and fire with respect to the location of the response
 ## ChR- neurons
 
 ## Tabular Data Relationship
-<img src='dast.png' width=600>
+<a href='https://dbdiagram.io/d/5d70d8a583427516dc0b5c71'>struct</a>
 <!--
 ## Describe your project
 
