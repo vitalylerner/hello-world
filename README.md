@@ -22,6 +22,8 @@ the stimulus is a map of spots
 Integrate and fire with respect to the location of the response
 ## ChR- neurons
 
+## Tabular Data Relationship
+<img src='dast.png' width=600>
 <!--
 ## Describe your project
 
