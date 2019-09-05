@@ -130,6 +130,9 @@ class morphology:
 			self.assign(fSWC)
 			if bAlign:
 				self.align()
+			self.branch()
+			self.calc_dist()
+			self.compartmentalize()
 			
 	def translate (self, v):
 		#move by a (x,y,z) vector
@@ -171,14 +174,21 @@ class morphology:
 				cSeg_start=cSeg['start']
 				cSeg_end=cSeg['end']
 				cSeg_length=cSeg['length']
+				cSeg_dist=cSeg['dist']
 				
 				cSeg_start_xy=array(swc[swc['id']==cSeg_start][['x','y']])[0]
 				cSeg_start_x=cSeg_start_xy[0]
 				cSeg_start_y=cSeg_start_xy[1]
+
 				cSeg_end_xy=array(swc[swc['id']==cSeg_end][['x','y']])[0]
 				cSeg_end_x=cSeg_end_xy[0]
 				cSeg_end_y=cSeg_end_xy[1]
-				plot([cSeg_start_x,cSeg_end_x],[cSeg_start_y,cSeg_end_y],'k',linewidth=cSeg_length/4.)
+				cSeg_clr=(200.-cSeg_dist)/200
+				if cSeg_clr<0:
+					cSeg_clr=0
+				cSeg_clr=cSeg_clr*ones(3)*0.8+0.1
+				plot([cSeg_start_x,cSeg_end_x],[cSeg_start_y,cSeg_end_y],color=cSeg_clr,linewidth=cSeg_length/4.)
+				#text(cSeg_start_x,cSeg_start_y,'{:.0f}'.format(cSeg_dist),size=8)
 				#print cSeg_start_xy,cSeg_end
 	def branch_swc(self,branch_id):
 		swc=self.swc
@@ -202,39 +212,46 @@ class morphology:
 			cBr=self.branches.iloc[iBranch,:]
 			cBr_ID=array(cBr['branch_id'])
 			cBr_SWC=self.branch_swc(cBr_ID)
-			cBr_xyzr=array(cBr_SWC[['x','y','z','r']])
-			cBr_x=cBr_xyzr[:,0]
-			cBr_y=cBr_xyzr[:,1]
+			cBr_xyzrd=array(cBr_SWC[['x','y','z','r','dist']])
+			cBr_x=cBr_xyzrd[:,0]
+			cBr_y=cBr_xyzrd[:,1]
 
-			Seg_S=[]
-			Seg_E=[]
-			Seg_D=[]
-			Seg_ID=[]
-			Seg_BID=[]
+			Seg_S=[]#start point
+			Seg_E=[]#end point
+			Seg_D=[]#Length
+			Seg_ID=[]#Segment ID
+			Seg_BID=[]#Branch ID
+			Seg_RD=[]#distance from root of the chief dendrite
+			
 			Seg_start_ind=0
 			Seg_cursor=1
-			Seg_end_limit=shape(cBr_xyzr)[0]-1
+			Seg_end_limit=shape(cBr_xyzrd)[0]-1
 			Seg_dist=0
 			while Seg_cursor<Seg_end_limit:
 				while Seg_dist<SEGMENT_LENGTH and Seg_cursor<=Seg_end_limit:
-					p1=cBr_xyzr[Seg_cursor,:3]
-					p2=cBr_xyzr[Seg_cursor-1,:3]
+					p1=cBr_xyzrd[Seg_cursor,:3]
+					p2=cBr_xyzrd[Seg_cursor-1,:3]
 					loc_dist=self.euclidian_distance(p1,p2)
 					Seg_dist+=loc_dist
 					Seg_cursor+=1
 				Seg_cnt+=1
 				seg_start_ind_global=cBr_SWC.iloc[Seg_start_ind,0]
 				seg_end_ind_global=cBr_SWC.iloc[Seg_cursor-1,0]
+				
+				seg_dist=mean(cBr_xyzrd[Seg_start_ind:Seg_cursor,4])
+				
 				Seg_S.append(seg_start_ind_global)
 				Seg_E.append(seg_end_ind_global)
 				Seg_D.append(Seg_dist)
 				Seg_BID.append(cBr_ID)
 				Seg_ID.append(Seg_cnt)
+				Seg_RD.append(seg_dist)
+				
 				Seg_dist=0
 				Seg_start_ind=Seg_cursor
 				Seg_cursor+=1
-			Seg_DICT={1:Seg_ID,2:Seg_S,3:Seg_E,4:Seg_D,5:Seg_BID}
-			Seg_Columns=['segment_ID','start','end','length','branch_id']
+			Seg_DICT={1:Seg_ID,2:Seg_S,3:Seg_E,4:Seg_D,5:Seg_BID,6:Seg_RD}
+			Seg_Columns=['segment_ID','start','end','length','branch_id','dist']
 			Seg=pd.DataFrame(data=Seg_DICT)
 			Seg.columns=Seg_Columns
 			Seg_DF.append(Seg)
@@ -267,17 +284,79 @@ class morphology:
 		
 		dt={1:branch_id,2:branch_start,3:branch_end,4:branch_parent_point,5:branch_parent_branch}
 		structure=pd.DataFrame(data=dt)
-		structure.columns=['branch_id','start','end','parent_point','parend_branch']
+		structure.columns=['branch_id','start','end','parent_point','parent_branch']
 		self.branches=structure
+		
+	def calc_dist(self):
+		#calculate distance for each point
+		#the distance is calculated from the root of
+		#the dendrite
+		#add a column to swc to indicate that number
+		
+		swc=self.swc
+		br=self.branches
+		
+		NP=shape(swc)[0]
 
+		dist=pd.DataFrame({'dist':zeros(NP)})
+
+		#swc_ext=pd.concat([swc,dist],axis=1)
+		#print swc_ext.head()
+		
+		roots=br[br['parent_branch']==-1]
+		
+		#initialize queue of branches with roots
+		br_pool=array(roots['branch_id'])
+		lut=pd.DataFrame(data={'id':[1],'dist':[0]})
+		#print lut.head()
+		
+		while len(br_pool)>0:
+			#dequeue to cBrID
+			cBrID=br_pool[0]
+			cBr=br[br['branch_id']==cBrID]
+			cBr_point_start=int(cBr['start'])
+			br_pool=br_pool[1:]
+			#print "dequeue\t", cBrID
+			
+			cBr_parent_branch=int(cBr['parent_branch'])
+			cBr_SWC=self.branch_swc(cBrID)
+			if cBr_parent_branch==-1:
+				l0=0
+			else:
+				cBr_parent_point=swc[swc['id']==int(cBr['parent_point'])]
+				cBr_parent_point_xyz=array(cBr_parent_point[['x','y','z']])
+				cBr_root_point_xyz=array(swc[swc['id']==cBr_point_start][['x','y','z']])
+				l00=self.euclidian_distance(cBr_parent_point_xyz,cBr_root_point_xyz)
+
+				cLUT_parent_point=lut[lut['id']==int(cBr['parent_point'])]
+				l01=int(cLUT_parent_point['dist'])
+				l0=l00+l01
+
+			#find all immideate children in the structure
+			#if found, enqueue them
+			br_children=array(br[br['parent_branch']==cBrID]['branch_id'])
+			if len(br_children)>0:
+				br_pool=hstack([br_pool,br_children])
+			
+			#calculate each point distance from the root of the branch
+			cBr_NP=shape(cBr_SWC)[0]
+			cBr_xyz=array(cBr_SWC[['x','y','z']])
+			cBr_ds=cumsum( hstack ( [[0],sum((cBr_xyz[1:,:]-cBr_xyz[:-1,:])**2,axis=1)] ))+l0
+			cBr_df=pd.DataFrame( data={1:list(cBr_SWC['id']),2:cBr_ds})
+			cBr_df.columns=['id','dist']
+			lut=pd.concat([lut,cBr_df],ignore_index=True)
+
+		self.swc=pd.merge(swc,lut,how='inner',on='id')
 
 F=['471129934.swc','515524026.swc','515249852.swc']
 S=[{'style':'.'},{'style':'.'},{'style':'.'}]
 fSWC=F[2]
 
 M=morphology(fSWC)
-M.branch()
-M.compartmentalize()
+#M.branch()
+#M.calc_dist()
+#M.compartmentalize()
+
 M.draw({'Layout':'Points'})
 #M.draw({'Layout':'Branches'})
 #M.draw({'Layout':'Segments'})
