@@ -17,7 +17,9 @@ Geometry: the slices are coronal, from the right hemisphere
 import pandas as pd
 from numpy import *
 from matplotlib.pyplot import *
-import os,shutil
+import os,shutil,pickle
+from multiprocessing import Pool,Process
+
 SEGMENT_LENGTH=8 #micron
 
 swc_path_base_allen='../AllenCells/SWC/'
@@ -315,7 +317,6 @@ class morphology:
         fSWC_EXT='MORPH/'+base_name+'/swcext.csv'
         fBranches='MORPH/'+base_name+'/branches.csv'
         fSegments='MORPH/'+base_name+'/segments.csv'
-
         self.swc=pd.read_csv(fSWC_EXT)
         self.branches=pd.read_csv(fBranches)
         self.segments=pd.read_csv(fSegments)
@@ -324,7 +325,8 @@ class morphology:
         fSWC_EXT='MORPH/'+base_name+'/swcext.csv'
         fBranches='MORPH/'+base_name+'/branches.csv'
         fSegments='MORPH/'+base_name+'/segments.csv'
-
+        #fPickle='MORPH/'+base_name+'/morph.pkl'
+        
         try:
             shutil.rmtree('MORPH/'+base_name)
         except:
@@ -339,7 +341,7 @@ class morphology:
         self.branches.to_csv(fBranches,index=False)
         self.swc.to_csv(fSWC_EXT,index=False)
         self.segments.to_csv(fSegments,index=False)
-
+        
 class neuron:
     # parameters are stored as pandas dataframe
     # of structure
@@ -355,14 +357,21 @@ class neuron:
         cellid=self.get_param_value('morph_cell_id')
         
         base_name=src+'_{}'.format(cellid)
-        self.morph.export_csv(base_name)
+        fPickle='MORPH/'+base_name+'/morph.pkl'
         
-    def import_morphology(self):
+        self.morph.export_csv(base_name)
+        pickle.dump(self.morph,open(fPickle, "wb" ))
+
+    def import_morphology(self,quick=False):
         src=self.get_param_value('morph_source')
         cellid=self.get_param_value('morph_cell_id')
         
         base_name=src+'_{}'.format(cellid)
-        self.morph.import_csv(base_name)
+        if quick:
+            fPickle='MORPH/'+base_name+'/morph.pkl'
+            self.morph=pickle.load( open( fPickle, "rb" ) )
+        else:
+            self.morph.import_csv(base_name)
         
         
     def get_param_units(self,name):
@@ -425,7 +434,10 @@ class neuron:
         dt = pd.read_csv(params_csv)
         self.params=dt
         self.neuron_id=neuron_id
-
+        
+def neuron_import_morphology(n):
+    n.import_morphology(True)
+    
 F=['471129934.swc','515524026.swc','515249852.swc']
 S=[{'style':'.'},{'style':'.'},{'style':'.'}]
 fSWC=F[0]
@@ -436,7 +448,7 @@ fSWC=F[0]
 #axis('equal')
 #show()
 
-def main():
+def __main__():
     lstCells=list_local_cells_allen()
     
     N=[None for id in lstCells]
@@ -448,8 +460,24 @@ def main():
         N[iN].assign_swc(fSWC)#,meta={'CellID':CellID,'Source':'Allen'})
         N[iN].assign_Allen_ID(CellID)
         
-        N[iN].export_morphology()
+        #N[iN].export_morphology()
+        #N[iN].import_morphology(True)
+    #if __name__=='__main__':
+        #p=Pool(4)
+    map(neuron_import_morphology,N)
+        #p.close()
+    """try:
+        if __name__=='__main__':
+            with Pool(7) as p:
+                p.map(neuron_import_morphology,N)
+         
+    except:
+        pass
+    #N[iN].import_morphology()
         #N[iN].morph.translate([iN*20,0,0])
+"""
+    for iN in range(len(N)):
+        CellID=N[iN].get_param_value('morph_cell_id')
         print CellID
         print "\t Points\t", len(array(N[iN].morph.swc['id']))
         print "\t Branches\t",len(array(N[iN].morph.branches['branch_id']))
@@ -464,4 +492,4 @@ def main():
     #show()
 
 
-main()
+__main__()
