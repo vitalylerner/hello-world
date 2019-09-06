@@ -17,15 +17,20 @@ Geometry: the slices are coronal, from the right hemisphere
 import pandas as pd
 from numpy import *
 from matplotlib.pyplot import *
+import os,shutil
 SEGMENT_LENGTH=8 #micron
 
+swc_path_base_allen='../AllenCells/SWC/'
+def list_local_cells_allen():
+    return [int(fn[:-4]) for fn in os.listdir(swc_path_base_allen)]
+    
 
 class morphology:
     swc=None
     swc0=None
     branches=None
     segments=None
-    
+    meta=None
     def read_swc (self,fSWC):
         #read standard morphology ascii file and
         #return: pandas dataframe of swc
@@ -38,7 +43,7 @@ class morphology:
         #store a copy of orginal swc data for reference
         self.swc=self.read_swc(fSWC)
         self.swc0=self.read_swc(fSWC)
-
+        
     def align(self):
         #move the neuron to (0,0)
         #rotate it such that its apical dendrite would reach uniform pia
@@ -305,6 +310,35 @@ class morphology:
 
         self.swc=pd.merge(swc,lut,how='inner',on='id')
 
+        
+    def import_csv(self,base_name):
+        fSWC_EXT='MORPH/'+base_name+'/swcext.csv'
+        fBranches='MORPH/'+base_name+'/branches.csv'
+        fSegments='MORPH/'+base_name+'/segments.csv'
+
+        self.swc=pd.read_csv(fSWC_EXT)
+        self.branches=pd.read_csv(fBranches)
+        self.segments=pd.read_csv(fSegments)
+        
+    def export_csv(self,base_name):
+        fSWC_EXT='MORPH/'+base_name+'/swcext.csv'
+        fBranches='MORPH/'+base_name+'/branches.csv'
+        fSegments='MORPH/'+base_name+'/segments.csv'
+
+        try:
+            shutil.rmtree('MORPH/'+base_name)
+        except:
+            pass
+        try:
+            os.rmdir('MORPH/'+base_name)
+        except:
+            pass
+        os.mkdir('MORPH/'+base_name)
+
+        #print '\t', self.meta
+        self.branches.to_csv(fBranches,index=False)
+        self.swc.to_csv(fSWC_EXT,index=False)
+        self.segments.to_csv(fSegments,index=False)
 
 class neuron:
     # parameters are stored as pandas dataframe
@@ -314,7 +348,23 @@ class neuron:
     params=None        #morphological and physiological parameters
     neuron_id=None    #identifier
     morph=None
-
+    
+    
+    def export_morphology(self):
+        src=self.get_param_value('morph_source')
+        cellid=self.get_param_value('morph_cell_id')
+        
+        base_name=src+'_{}'.format(cellid)
+        self.morph.export_csv(base_name)
+        
+    def import_morphology(self):
+        src=self.get_param_value('morph_source')
+        cellid=self.get_param_value('morph_cell_id')
+        
+        base_name=src+'_{}'.format(cellid)
+        self.morph.import_csv(base_name)
+        
+        
     def get_param_units(self,name):
     #retrieve units of a certain parameter
         sp=self.params
@@ -328,19 +378,37 @@ class neuron:
         sp=self.params
         cValue=sp[sp['name']==name]['value']
         cDType=sp[sp['name']==name]['datatype'].to_string(index=False)
+        cValue2=cValue.to_string(index=False)
         if cDType=='bool':
-            cValue2=cValue.to_string(index=False)
             cVal=cValue2=='True'
         elif cDType=='real':
-            cValue2=cValue.to_string(index=False)
             cVal=float(cValue2)
+        elif cDType=='string':
+            cVal=cValue2
+        elif cDType=='int':
+            cVal=int(cValue2)
         return cVal
-    
+        
+    def set_param_value(self,name,value):
+        i=self.params[self.params['name']==name].index
+        self.params.ix[i,'value']=value
+
     def assign_morphology(self,M):
         self.morph=M
-    def assign_swc(self,swc_path):
-        M=morphology(swc_path)
+        
+    def assign_swc(self,swc_path,meta=None):
+        M=morphology(swc_path,meta)
         self.assign_morphology(M)
+        
+    def assign_Allen_ID(self,CellID_Allen):
+        self.set_param_value('morph_source','ALLEN')
+        self.set_param_value('morph_cell_id',CellID_Allen)
+        #print self.params
+        
+    def assign_Lerner_ID(self,CellID_Lerner):
+        self.set_param_value('morph_source','LERNER')
+        self.set_param_value('morph_cell_id',CellID_Lerner)
+        #print self.params
         
     def list_params(self):
     #retrieve a list of all physiological and morphological parameters
@@ -368,22 +436,32 @@ fSWC=F[0]
 #axis('equal')
 #show()
 
-n1=neuron(0)
-n1.assign_swc(fSWC)
+def main():
+    lstCells=list_local_cells_allen()
+    
+    N=[None for id in lstCells]
+
+    for iN,CellID in enumerate(lstCells):
+        
+        N[iN]=neuron(iN)
+        fSWC=swc_path_base_allen+'{}.swc'.format(CellID)
+        N[iN].assign_swc(fSWC)#,meta={'CellID':CellID,'Source':'Allen'})
+        N[iN].assign_Allen_ID(CellID)
+        
+        N[iN].export_morphology()
+        #N[iN].morph.translate([iN*20,0,0])
+        print CellID
+        print "\t Points\t", len(array(N[iN].morph.swc['id']))
+        print "\t Branches\t",len(array(N[iN].morph.branches['branch_id']))
+        print "\t Segments\t", len(array(N[iN].morph.segments['segment_id']))
+        print ''
+        
+        #N[iN].morph.draw({'Layout':'Segments'})
+        #axis('equal')
+        #box('off')
+        #savefig('FIG/{}_Segments.png'.format(CellID))
+        #clf()
+    #show()
 
 
-print "Points\t", len(array(n1.morph.swc['id']))
-print "Branches\t",len(array(n1.morph.branches['branch_id']))
-print "Segments\t", len(array(n1.morph.segments['segment_id']))
-
-n1.morph.draw({'Layout':'Segments'})
-axis('equal')
-show()
-#a=n1.get_param('tau')
-"""c=n1.list_params()
-for p in c:
-    a=n1.get_param_value(p)
-    u=n1.get_param_units(p)
-    print (p,'\t',a,'\t',u)
-
-"""
+main()

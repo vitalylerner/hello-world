@@ -6,3 +6,5 @@ R,real,MOhm,250
 soma_z,real,um,50
 soma_x,real,um,0
 soma_y,real,um,650
+morph_source,string,none,Allen
+morph_cell_id,int,none,0
