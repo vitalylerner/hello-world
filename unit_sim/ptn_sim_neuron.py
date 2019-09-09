@@ -30,6 +30,48 @@ def list_local_cells_allen():
     return [int(fn[:-4]) for fn in os.listdir(swc_path_base_allen)]
     
 
+"""
+Functions for numerical integration of light on soma
+"""
+def sphere_equi(n=500):
+    ##https://www.cmu.edu/biolphys/deserno/pdf/sphere_equi.pdf
+    a=4*pi/n
+    d=sqrt(a)
+    Mth=int(round(pi/d))
+    #print Mth
+    dth=pi/Mth
+    dphi=a/dth
+
+    k=0
+    theta=[]
+    phi=[]
+    for m in range(Mth):
+        cTh=pi*(m+0.5)/Mth
+        Mphi=int(round(2*pi*sin(cTh)/dphi))
+        for n in range(Mphi):
+            cPhi=2*pi*n/Mphi
+            theta.append(cTh)
+            phi.append(cPhi)
+            
+
+    x = sin(theta) * cos(phi)
+    y = sin(theta) * sin(phi)
+    z = cos(theta)
+    return x,y,z
+    
+n_points_on_sphere=500 #keep constant
+crd_x,crd_y,crd_z=sphere_equi(n_points_on_sphere)
+
+def soma_integrate_light(r_soma,r_spot,x_spot):
+
+    v = exp( - ((r_soma*crd_x-x_spot)**2+(r_soma*crd_y)**2)/(2*r_spot**2) )
+
+    return sum(v)*4*pi*r_soma**2/len(v)
+
+"""
+End of Light on Soma integration
+"""
+
 class morphology:
     swc=None
     swc0=None
@@ -511,6 +553,11 @@ class neuron:
         tblSegs=self.morph.segments_geometry()
         l=array(tblSegs['length'])
         d=array(tblSegs['dist'])
+        
+        sCoM,rSoma=self.morph.soma_geometry()
+        xSoma=sCoM[0]
+        ySoma=sCoM[1]
+        
         x0=array(tblSegs['x0'])
         y0=array(tblSegs['y0'])
         
@@ -544,8 +591,8 @@ class neuron:
         
 
         L=lambda x,y,xs,ys,rs:1.*exp(- ((x-xs)**2+(y-ys)**2)/(2*rs**2))
-        ax=gca()
-        ax.add_artist(Circle((spot['x'],spot['y']),spot['r'],alpha=0.6,color=[0.2,0.2,0.8]))
+        #ax=gca()
+        #ax.add_artist(Circle((spot['x'],spot['y']),spot['r'],alpha=0.6,color=[0.2,0.2,0.8]))
         NSeg=len(x0)
         Flux=zeros(NSeg)
         for iSeg in range(NSeg):#[10,13,14]:
@@ -553,6 +600,13 @@ class neuron:
             Flux[iSeg]=flux
             #clrval=0.05+1.2*(log10(flux)+3)/5
             #plot( [x0[iSeg],x1[iSeg]+x0[iSeg]],[y0[iSeg],y1[iSeg]+y0[iSeg]],color=clrval*ones(3))
+            
+        #separately calculate soma
+        dx_soma=spot['x']-xSoma
+        dy_soma=spot['y']-ySoma
+        
+        delta_soma=sqrt(dx_soma**2+dy_soma**2)
+        
         return pd.DataFrame(data={'flux':Flux,'dist':d})
         
     def apply_optostim(self,lstim):
@@ -560,7 +614,6 @@ class neuron:
         dur=lstim.seq_params['dur']
         ISI=lstim.seq_params['ISI']
         lst=lstim.seq_params['lst']
-        print lst
         nstim=len(lst)
         dur_tot=nstim*ISI+dur
         r=lstim.spots_r
@@ -579,9 +632,11 @@ class neuron:
              tmp=outer(ones([1,dur]),flux).T
              #print 'A',shape(tmp),shape( L[:,ct:ct+dur])
              L[:,ct:ct+dur]+=tmp
+        return L
         #print L
-        matshow(log10(L))
-        show()
+        #matshow(log10(L))
+        #show()
+
 class optostim:
     spots_xy=[]
     spots_r=0
@@ -638,8 +693,8 @@ class optostim:
        
 lstCells=list_local_cells_allen()
 N=[None for id in lstCells]
-
-for iN,CellID in enumerate(lstCells[:3]):
+print time.asctime( time.localtime(time.time()) )
+for iN,CellID in enumerate(lstCells[:1]):
     N[iN]=neuron(iN)
     fSWC=swc_path_base_allen+'{}.swc'.format(CellID)
     N[iN].assign_Allen_ID(CellID)
@@ -651,17 +706,22 @@ for iN,CellID in enumerate(lstCells[:3]):
     
     #N[iN].morph.soma_geometry()
 
+print time.asctime( time.localtime(time.time()) )
 
 map_params={'r':10,'dr':20,'x0':0,'y0':-570,'N':3}
 lstim=optostim(map_params)
-S=[0,1,2,3,4,5,6,7,8,9,11,13,15,17,19,25]
+S=[8,18,16,13,10]
 lstim.assign_seq({'lst':S,'ISI':20,'dur':30})
 
-N[0].apply_optostim(lstim)
+L=N[0].apply_optostim(lstim)
 
+print time.asctime( time.localtime(time.time()) )
 #N[0].morp.draw({
 #N[0].apply_spot({'x':-50,'y':-700,'r':20})
-
+figure()
 lstim.draw()
-axis('equal')
+figure()
+matshow(L)
+print time.asctime( time.localtime(time.time()) )
+#axis('equal')
 show()
