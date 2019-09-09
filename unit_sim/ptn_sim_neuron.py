@@ -34,6 +34,9 @@ def list_local_cells_allen():
 Functions for numerical integration of light on soma
 """
 def sphere_equi(n=500):
+    #distribute points represented by Eucledean coordinates
+    #use deterministic method (non-random)
+    #achieve equidistribution with the method described there:
     ##https://www.cmu.edu/biolphys/deserno/pdf/sphere_equi.pdf
     a=4*pi/n
     d=sqrt(a)
