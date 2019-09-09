@@ -24,8 +24,8 @@ from mpl_toolkits.mplot3d import axes3d, Axes3D
 from scipy import integrate
 
 SEGMENT_LENGTH=8 #micron
-
 swc_path_base_allen='../AllenCells/SWC/'
+
 def list_local_cells_allen():
     return [int(fn[:-4]) for fn in os.listdir(swc_path_base_allen)]
     
@@ -52,10 +52,7 @@ class morphology:
         
         swc_pStart=array([ array(swc[swc['id']==ist][['x','y']]) for ist in swc_iStart]).squeeze()
         swc_pEnd=array([ array(swc[swc['id']==ien][['x','y']]) for ien in swc_iEnd]).squeeze()
-        
-        #plot(swc_pStart[:,0],swc_pStart[:,1],'.')
-        #plot(swc_pEnd[:,0],swc_pEnd[:,1],'.')
-        
+
         geom=pd.DataFrame(data={1:seg_id,           
                                 2:swc_pStart[:,0],  3:swc_pStart[:,1],  
                                 4:swc_pEnd[:,0],    5:swc_pEnd[:,1],
@@ -65,8 +62,8 @@ class morphology:
                                  'x0','y0',
                                  'x1','y1',
                                  'length','dist']
-
         return geom
+        
     def soma_geometry(self):
 
         hbr=array(self.swc[self.swc['id'].isin(list(self.branches[self.branches['parent_branch']==-1]['start']))][['x','y','z']])
@@ -504,16 +501,16 @@ class neuron:
         self.params=dt
         self.neuron_id=neuron_id
         self.morph=morphology()
-        
-    def apply_spot(self,spot):
-        #seg=self.morph.segments
-        #swc=self.morph.
-        #iSeg=0
-        #cSeg=array(seg.iloc[iSeg,:][['start','end']])
-        #print cSeg
-        
+    
+    def spot_flux(self,spot):
+        """
+        Apply a single spot (timeless) to a neuron
+        Input: spot : dict of x,y,r
+        Output: table of segments: dist (um), light flux (au)
+        """
         tblSegs=self.morph.segments_geometry()
         l=array(tblSegs['length'])
+        d=array(tblSegs['dist'])
         x0=array(tblSegs['x0'])
         y0=array(tblSegs['y0'])
         
@@ -549,21 +546,47 @@ class neuron:
         L=lambda x,y,xs,ys,rs:1.*exp(- ((x-xs)**2+(y-ys)**2)/(2*rs**2))
         ax=gca()
         ax.add_artist(Circle((spot['x'],spot['y']),spot['r'],alpha=0.6,color=[0.2,0.2,0.8]))
-        #plot(spot['x'],spot['y'],'or')
         NSeg=len(x0)
+        Flux=zeros(NSeg)
         for iSeg in range(NSeg):#[10,13,14]:
             flux=integrate.dblquad(L, 0, x1t[iSeg], lambda x: -.1*l[iSeg], lambda x: .1*l[iSeg],args=(xst[iSeg],yst[iSeg],rs))[0]+0.001
-            
-            clrval=0.05+1.2*(log10(flux)+3)/5
-            plot( [x0[iSeg],x1[iSeg]+x0[iSeg]],[y0[iSeg],y1[iSeg]+y0[iSeg]],color=clrval*ones(3))
-        #axis('equal')
-        #show()
-
-
+            Flux[iSeg]=flux
+            #clrval=0.05+1.2*(log10(flux)+3)/5
+            #plot( [x0[iSeg],x1[iSeg]+x0[iSeg]],[y0[iSeg],y1[iSeg]+y0[iSeg]],color=clrval*ones(3))
+        return pd.DataFrame(data={'flux':Flux,'dist':d})
+        
+    def apply_optostim(self,lstim):
+        #Parameters of light stimuli
+        dur=lstim.seq_params['dur']
+        ISI=lstim.seq_params['ISI']
+        lst=lstim.seq_params['lst']
+        print lst
+        nstim=len(lst)
+        dur_tot=nstim*ISI+dur
+        r=lstim.spots_r
+        
+        #morphology
+        Nseg=len(array(self.morph.segments['segment_id']))
+        L=zeros([Nseg,dur_tot])
+        
+        #superimpose light flux from all stimuli
+        for isp,nsp in enumerate(lst):
+             cspot={'x':lstim.spots_xy[nsp,0],'y':lstim.spots_xy[nsp,1],'r':r}
+             ct=isp*ISI
+             fld=self.spot_flux(cspot)
+             flux=fld['flux']
+             dist=fld['dist']
+             tmp=outer(ones([1,dur]),flux).T
+             #print 'A',shape(tmp),shape( L[:,ct:ct+dur])
+             L[:,ct:ct+dur]+=tmp
+        #print L
+        matshow(log10(L))
+        show()
 class optostim:
     spots_xy=[]
     spots_r=0
     map_params={}
+    seq_params={}
     
     def circ_nspots(self,n):
         if n>5:
@@ -574,7 +597,11 @@ class optostim:
     def __init__    (self,map_params=None):
         if not map_params==None:
             self.build_map(map_params)
-            
+    
+    def assign_seq(self,seq_params):
+        self.seq_params=seq_params
+        
+    
     def draw        (self):
         Map=self.spots_xy
         r=self.spots_r
@@ -605,9 +632,7 @@ class optostim:
             c_x=c_r*cos(c_th)+x0
             c_y=c_r*sin(c_th)+y0
             cp=vstack([c_x,c_y]).T
-
             Map=vstack([Map,cp])
-
         self.spots_xy=Map
 
        
@@ -621,16 +646,22 @@ for iN,CellID in enumerate(lstCells[:3]):
     N[iN].import_morphology()
     N[iN].morph.translate([15*iN,0,0])
     #N[iN].morph.draw({'Layout':'Branches','alpha':0.4})
-    N[iN].morph.draw({'Layout':'Soma','alpha':0.4})
-    N[iN].apply_spot({'x':-50,'y':-600,'r':20})
+    #N[iN].morph.draw({'Layout':'Soma','alpha':0.4})
+    #N[iN].spot_flux({'x':-50,'y':-600,'r':20})
+    
     #N[iN].morph.soma_geometry()
 
 
-map_params={'r':10,'dr':40,'x0':0,'y0':-570,'N':3}
-m=optostim(map_params)
+map_params={'r':10,'dr':20,'x0':0,'y0':-570,'N':3}
+lstim=optostim(map_params)
+S=[0,1,2,3,4,5,6,7,8,9,11,13,15,17,19,25]
+lstim.assign_seq({'lst':S,'ISI':20,'dur':30})
+
+N[0].apply_optostim(lstim)
+
 #N[0].morp.draw({
 #N[0].apply_spot({'x':-50,'y':-700,'r':20})
 
-#m.draw()
+lstim.draw()
 axis('equal')
 show()
