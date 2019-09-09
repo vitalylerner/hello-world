@@ -137,9 +137,14 @@ class morphology:
 
         if params==None:
             Layout='Segments'
+            alpha=0.4
         else:
             Layout=params['Layout']
-
+            if 'alpha' in params.keys():
+                alpha=params['alpha']
+            else:
+                alpha=0.4
+    
         swc=self.swc
 
         if Layout=='Points':
@@ -159,7 +164,11 @@ class morphology:
                 cBr_y=array(cBr_SWC['y'])
                 cBr_z=array(cBr_SWC['z'])
                 cBr_r=array(cBr_SWC['r'])
-                plot(cBr_x,cBr_y,'.-',linewidth=0.3,markersize=0.4,alpha=0.8)
+                plot(cBr_x,cBr_y,'-',markersize=0.05,linewidth=1,alpha=alpha)
+        elif Layout=='Soma':
+            soma_CoM,soma_r=self.soma_geometry()
+            ax=gca()
+            ax.add_artist(Circle((soma_CoM[0],soma_CoM[1]),soma_r,alpha=alpha,color=[0.2,0.2,0.2]))
         elif Layout=='Segments':
             seg=self.segments
             for iSeg in range(len(seg)):
@@ -464,13 +473,75 @@ class neuron:
         self.neuron_id=neuron_id
         self.morph=morphology()
 
+
+class optostim:
+    spots_xy=[]
+    spots_r=0
+    map_params={}
+    
+    def circ_nspots(self,n):
+        if n>5:
+            return 0
+        else:
+            return [1,8,12,18,25,31][n]
+            
+    def __init__    (self,map_params=None):
+        if not map_params==None:
+            self.build_map(map_params)
+            
+    def draw        (self):
+        Map=self.spots_xy
+        r=self.spots_r
+        for im in range(shape(Map)[0]):
+            m=Map[im,:]
+            plot(m[0],m[1],'.',alpha=0)
+            ax=gca()
+            ax.add_artist(Circle((m[0],m[1]),r,alpha=0.6,color=[0.2,0.2,0.8]))
+            text(m[0],m[1],'{}'.format(im),horizontalalignment='center',   verticalalignment='center',)
+
+        
+    def build_map   (self,map_params):
+        self.map_params=map_params
+        r=map_params['r']
+        dr=map_params['dr']
+        x0=map_params['x0']
+        y0=map_params['y0']
+        N=map_params['N']
+        self.spots_r=r
+        spot0=[x0,y0]
+        Map=array(spot0)
+        
+        for iCircle in range(1,N+1):
+            c_n=self.circ_nspots(iCircle)
+            c_r=dr*iCircle
+            c_dth=2*pi/c_n
+            c_th=arange(c_n)*c_dth
+            c_x=c_r*cos(c_th)+x0
+            c_y=c_r*sin(c_th)+y0
+            cp=vstack([c_x,c_y]).T
+
+            Map=vstack([Map,cp])
+
+        self.spots_xy=Map
+
+       
 lstCells=list_local_cells_allen()
 N=[None for id in lstCells]
 
-for iN,CellID in enumerate(lstCells[:3]):
+for iN,CellID in enumerate(lstCells):
     N[iN]=neuron(iN)
     fSWC=swc_path_base_allen+'{}.swc'.format(CellID)
     N[iN].assign_Allen_ID(CellID)
     N[iN].import_morphology()
-    N[iN].morph.soma_geometry()
+    N[iN].morph.translate([15*iN,0,0])
+    N[iN].morph.draw({'Layout':'Branches','alpha':0.4})
+    N[iN].morph.draw({'Layout':'Soma','alpha':0.4})
+    
+    #N[iN].morph.soma_geometry()
+
+
+map_params={'r':10,'dr':40,'x0':150,'y0':-570,'N':3}
+m=optostim(map_params)
+m.draw()
+axis('equal')
 show()
