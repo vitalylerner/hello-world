@@ -1,5 +1,5 @@
 ﻿# Simulation of ChR2 neurons in coronal slices
-
+<img src='snapshot.png' width=700>
 
 
 ## Slices geometry
