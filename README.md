@@ -15,6 +15,7 @@ the slices are coronal, from the right hemisphere
        x axis is parallel to a local line of pia and wm 
        approximately right to left
 </ul>
+
 ## Stimulation geometry
 the stimulus is a map of spots
 
