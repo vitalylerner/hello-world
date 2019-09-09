@@ -21,6 +21,7 @@ import os,shutil,pickle
 from multiprocessing import Pool,Process
 import time
 from mpl_toolkits.mplot3d import axes3d, Axes3D
+from scipy import integrate
 
 SEGMENT_LENGTH=8 #micron
 
@@ -35,6 +36,37 @@ class morphology:
     branches=None
     segments=None
     meta=None
+    
+    def segments_geometry(self):
+        #combines swc and segments tables
+        #to yield the table of the form
+        #segment_id,x0,y0,x1,y1,length,dist
+        swc=self.swc
+        seg=self.segments
+        
+        swc_iStart=array(seg['start'])
+        swc_iEnd=array(seg['end'])
+        seg_dist=array(seg['dist'])
+        seg_length=array(seg['length'])
+        seg_id=array(seg['segment_id'])
+        
+        swc_pStart=array([ array(swc[swc['id']==ist][['x','y']]) for ist in swc_iStart]).squeeze()
+        swc_pEnd=array([ array(swc[swc['id']==ien][['x','y']]) for ien in swc_iEnd]).squeeze()
+        
+        #plot(swc_pStart[:,0],swc_pStart[:,1],'.')
+        #plot(swc_pEnd[:,0],swc_pEnd[:,1],'.')
+        
+        geom=pd.DataFrame(data={1:seg_id,           
+                                2:swc_pStart[:,0],  3:swc_pStart[:,1],  
+                                4:swc_pEnd[:,0],    5:swc_pEnd[:,1],
+                                6:seg_length,       7:seg_dist})
+                                
+        geom.columns=           ['segment_id',
+                                 'x0','y0',
+                                 'x1','y1',
+                                 'length','dist']
+
+        return geom
     def soma_geometry(self):
 
         hbr=array(self.swc[self.swc['id'].isin(list(self.branches[self.branches['parent_branch']==-1]['start']))][['x','y','z']])
@@ -472,6 +504,60 @@ class neuron:
         self.params=dt
         self.neuron_id=neuron_id
         self.morph=morphology()
+        
+    def apply_spot(self,spot):
+        #seg=self.morph.segments
+        #swc=self.morph.
+        #iSeg=0
+        #cSeg=array(seg.iloc[iSeg,:][['start','end']])
+        #print cSeg
+        
+        tblSegs=self.morph.segments_geometry()
+        l=array(tblSegs['length'])
+        x0=array(tblSegs['x0'])
+        y0=array(tblSegs['y0'])
+        
+        x1=array(tblSegs['x1'])-x0
+        y1=array(tblSegs['y1'])-y0
+        
+        xs=spot['x']-x0
+        ys=spot['y']-y0
+        rs=spot['r']
+        x0t=0*x0
+        y0t=0*y0
+        
+        dx=x1-x0
+        dy=y1-y0
+        k=dy/dx
+        alpha=arctan(k)
+        
+        x0t=x0*cos(alpha)+y0*sin(alpha)
+        y0t=-x0*sin(alpha)+y0*cos(alpha)
+        
+        x1t=x1*cos(alpha)+y1*sin(alpha)
+        y1t=-x1*sin(alpha)+y1*cos(alpha)
+        
+        xst=xs*cos(alpha)+ys*sin(alpha)
+        yst=-xs*sin(alpha)+ys*cos(alpha)
+        
+        rNeg=x1t<0
+        x1t[rNeg]=-x1t[rNeg]
+        xst[rNeg]=-xst[rNeg]
+        yst[rNeg]=-yst[rNeg]
+        
+
+        L=lambda x,y,xs,ys,rs:1.*exp(- ((x-xs)**2+(y-ys)**2)/(2*rs**2))
+        ax=gca()
+        ax.add_artist(Circle((spot['x'],spot['y']),spot['r'],alpha=0.6,color=[0.2,0.2,0.8]))
+        #plot(spot['x'],spot['y'],'or')
+        NSeg=len(x0)
+        for iSeg in range(NSeg):#[10,13,14]:
+            flux=integrate.dblquad(L, 0, x1t[iSeg], lambda x: -.1*l[iSeg], lambda x: .1*l[iSeg],args=(xst[iSeg],yst[iSeg],rs))[0]+0.001
+            
+            clrval=0.05+1.2*(log10(flux)+3)/5
+            plot( [x0[iSeg],x1[iSeg]+x0[iSeg]],[y0[iSeg],y1[iSeg]+y0[iSeg]],color=clrval*ones(3))
+        #axis('equal')
+        #show()
 
 
 class optostim:
@@ -528,20 +614,23 @@ class optostim:
 lstCells=list_local_cells_allen()
 N=[None for id in lstCells]
 
-for iN,CellID in enumerate(lstCells):
+for iN,CellID in enumerate(lstCells[:3]):
     N[iN]=neuron(iN)
     fSWC=swc_path_base_allen+'{}.swc'.format(CellID)
     N[iN].assign_Allen_ID(CellID)
     N[iN].import_morphology()
     N[iN].morph.translate([15*iN,0,0])
-    N[iN].morph.draw({'Layout':'Branches','alpha':0.4})
+    #N[iN].morph.draw({'Layout':'Branches','alpha':0.4})
     N[iN].morph.draw({'Layout':'Soma','alpha':0.4})
-    
+    N[iN].apply_spot({'x':-50,'y':-600,'r':20})
     #N[iN].morph.soma_geometry()
 
 
-map_params={'r':10,'dr':40,'x0':150,'y0':-570,'N':3}
+map_params={'r':10,'dr':40,'x0':0,'y0':-570,'N':3}
 m=optostim(map_params)
-m.draw()
+#N[0].morp.draw({
+#N[0].apply_spot({'x':-50,'y':-700,'r':20})
+
+#m.draw()
 axis('equal')
 show()
