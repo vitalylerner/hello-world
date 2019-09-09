@@ -19,6 +19,8 @@ from numpy import *
 from matplotlib.pyplot import *
 import os,shutil,pickle
 from multiprocessing import Pool,Process
+import time
+from mpl_toolkits.mplot3d import axes3d, Axes3D
 
 SEGMENT_LENGTH=8 #micron
 
@@ -33,6 +35,31 @@ class morphology:
     branches=None
     segments=None
     meta=None
+    def soma_geometry(self):
+
+        hbr=array(self.swc[self.swc['id'].isin(list(self.branches[self.branches['parent_branch']==-1]['start']))][['x','y','z']])
+         
+        CoM=array(mean(matrix(hbr),axis=0))[0]
+        R=sqrt(sum((hbr-CoM)**2,axis=1))
+        r=0.5*(mean(R)+max(R))
+        
+        """For debugging purposes
+        f=figure()
+        #ax=f.add_subplot(111,projection='3d')
+        ax = Axes3D(f)
+        print r
+        phi, theta = np.mgrid[0.0:pi:0.1*pi, 0.0:2.0*pi:0.1*pi]
+        x = r*sin(phi)*cos(theta)+CoM[0]
+        y = r*sin(phi)*sin(theta)+CoM[1]
+        z = r*cos(phi)+CoM[2]
+        ax.plot_surface(
+        x, y, z,  rstride=1, cstride=1, color='c', alpha=0.4, linewidth=2)
+
+        ax.plot(hbr[:,0],hbr[:,1],hbr[:,2],'x')
+        ax.plot([CoM[0]],[CoM[1]],[CoM[2]],'or')
+        """
+        return CoM,r
+        
     def read_swc (self,fSWC):
         #read standard morphology ascii file and
         #return: pandas dataframe of swc
@@ -346,10 +373,15 @@ class neuron:
     # parameters are stored as pandas dataframe
     # of structure
     # nams, datatype, units, value
-
+    
+    """procedure for importing swc and exporting a cell
+    n.assign_Allen_ID()/n.assign_Lerner_ID()
+    n.assign_swc(path_to_swc)
+    n.export_morphology()
+    """
     params=None        #morphological and physiological parameters
     neuron_id=None    #identifier
-    morph=None
+    morph=None        #morphology
     
     
     def export_morphology(self):
@@ -362,16 +394,12 @@ class neuron:
         self.morph.export_csv(base_name)
         pickle.dump(self.morph,open(fPickle, "wb" ))
 
-    def import_morphology(self,quick=False):
+    def import_morphology(self):
         src=self.get_param_value('morph_source')
         cellid=self.get_param_value('morph_cell_id')
         
         base_name=src+'_{}'.format(cellid)
-        if quick:
-            fPickle='MORPH/'+base_name+'/morph.pkl'
-            self.morph=pickle.load( open( fPickle, "rb" ) )
-        else:
-            self.morph.import_csv(base_name)
+        self.morph.import_csv(base_name)
         
         
     def get_param_units(self,name):
@@ -405,8 +433,8 @@ class neuron:
     def assign_morphology(self,M):
         self.morph=M
         
-    def assign_swc(self,swc_path,meta=None):
-        M=morphology(swc_path,meta)
+    def assign_swc(self,swc_path):
+        M=morphology(swc_path)
         self.assign_morphology(M)
         
     def assign_Allen_ID(self,CellID_Allen):
@@ -434,62 +462,15 @@ class neuron:
         dt = pd.read_csv(params_csv)
         self.params=dt
         self.neuron_id=neuron_id
-        
-def neuron_import_morphology(n):
-    n.import_morphology(True)
-    
-F=['471129934.swc','515524026.swc','515249852.swc']
-S=[{'style':'.'},{'style':'.'},{'style':'.'}]
-fSWC=F[0]
+        self.morph=morphology()
 
-#M=morphology(fSWC)
+lstCells=list_local_cells_allen()
+N=[None for id in lstCells]
 
-#M.draw({'Layout':'Segments'})
-#axis('equal')
-#show()
-
-def __main__():
-    lstCells=list_local_cells_allen()
-    
-    N=[None for id in lstCells]
-
-    for iN,CellID in enumerate(lstCells):
-        
-        N[iN]=neuron(iN)
-        fSWC=swc_path_base_allen+'{}.swc'.format(CellID)
-        N[iN].assign_swc(fSWC)#,meta={'CellID':CellID,'Source':'Allen'})
-        N[iN].assign_Allen_ID(CellID)
-        
-        #N[iN].export_morphology()
-        #N[iN].import_morphology(True)
-    #if __name__=='__main__':
-        #p=Pool(4)
-    map(neuron_import_morphology,N)
-        #p.close()
-    """try:
-        if __name__=='__main__':
-            with Pool(7) as p:
-                p.map(neuron_import_morphology,N)
-         
-    except:
-        pass
-    #N[iN].import_morphology()
-        #N[iN].morph.translate([iN*20,0,0])
-"""
-    for iN in range(len(N)):
-        CellID=N[iN].get_param_value('morph_cell_id')
-        print CellID
-        print "\t Points\t", len(array(N[iN].morph.swc['id']))
-        print "\t Branches\t",len(array(N[iN].morph.branches['branch_id']))
-        print "\t Segments\t", len(array(N[iN].morph.segments['segment_id']))
-        print ''
-        
-        #N[iN].morph.draw({'Layout':'Segments'})
-        #axis('equal')
-        #box('off')
-        #savefig('FIG/{}_Segments.png'.format(CellID))
-        #clf()
-    #show()
-
-
-__main__()
+for iN,CellID in enumerate(lstCells[:3]):
+    N[iN]=neuron(iN)
+    fSWC=swc_path_base_allen+'{}.swc'.format(CellID)
+    N[iN].assign_Allen_ID(CellID)
+    N[iN].import_morphology()
+    N[iN].morph.soma_geometry()
+show()
