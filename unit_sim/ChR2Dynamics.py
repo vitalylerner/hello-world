@@ -39,7 +39,7 @@ class ChR2Dynamics:
            """
         F=prm['F'] #photons/ms
         pulse_start=10 #ms
-        pulse_end=pulse_start+100#ms
+        pulse_end=pulse_start+30#ms
         if t>pulse_start and t<pulse_end:
             Gr=1./5.#prm['Grdark']
         else:
@@ -77,8 +77,8 @@ class ChR2Dynamics:
     
     def L2I(self,t,L):
         N=self.params['N']
-        O1_0=0
-        O2_0=0
+        O1_0=0.0*N
+        O2_0=0.0*N
         C1_0=0.61*N
         C2_0=N-O1_0-O2_0-C1_0
         Y0=[O1_0,O2_0,C1_0,C2_0]
@@ -88,7 +88,7 @@ class ChR2Dynamics:
         Y[0,:]=Y0
         for it,ct in enumerate(t[1:]):
             
-            cY=list(odeint(self.dYdt,Y0,[ct,ct+1],args=(self.params,))[1].squeeze())
+            cY=list(odeint(self.dYdt,Y0,[ct,ct+self.params['dt']],args=(self.params,))[1].squeeze())
             #print ct,Y0,cY
             cY[2]=self.params['N']-cY[0]-cY[1]-cY[3]
             
@@ -101,12 +101,14 @@ class ChR2Dynamics:
         return I#odeint(self.dYdt,Y0,t,args=(self.params,))
         
 ChR2=ChR2Dynamics()
-t=linspace(0,300,301)
+tend=300
+
+t=linspace(0,tend,tend*2+1)
 for eps1 in [0.0001,0.0005,0.001,0.005,0.01,0.05,0.1,0.5,1]:
     ChR2.params['eps1']=eps1
     
     I=ChR2.L2I(t,100)
-    plot(t,I)#,'k',linewidth=2)
+    plot(t+0.5,I)#,'k',linewidth=2)
 #print (shape(Y))
 
 
