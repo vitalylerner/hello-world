@@ -1,6 +1,6 @@
 ﻿# Simulation of ChR2 neurons in coronal slices
 <img src='snapshot.png' width=450><nobr>
-<img src='snapshot_20190909_2.png' width=250>
+<img src='snapshot_20190912_1.png' width=250>
 
 ## Slices geometry
 
@@ -26,6 +26,14 @@ Integrate and fire with respect to the location of the response
 ## Tabular Data Relationship
 <img src='dast.png' width=700>
 <a href='https://dbdiagram.io/d/5d70d8a583427516dc0b5c71'>struct</a>
+
+
+
+
+
+
+
+
 <!--
 ## Describe your project
 

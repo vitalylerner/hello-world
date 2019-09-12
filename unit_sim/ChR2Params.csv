@@ -5,10 +5,15 @@ Gd1,ms^-1,0.13,,10.1111/j.1751-1097.2008.00460.x
 Gd2,ms^-1,0.025,,10.1111/j.1751-1097.2008.00460.x
 eps1,,0.5,,10.1111/j.1751-1097.2008.00460.x
 eps2,,0.03,,10.1111/j.1751-1097.2008.00460.x
-Grdark,ms^-1,0.0004,,10.1111/j.1751-1097.2008.00460.x
+Grdark,ms^-1,0.00020301,,fit
+Grslope,,0.01087846,,fit
+eps2_p1,,2,,fit
+eps2_p0,,-0.5,,fit
+phi0,ph.um^-2.s^-1,1.75e8,,fit
+phimax,ph.um^-1.s^-1,1.0e10,,approximation
 tau,ms,5.3,,10.1111/j.1751-1097.2008.00460.x
 F,,1,,
 N,,1000,number of channel copies,
 gamma,,0.05,conductivity ratio g(O2)/g(O2),
-Imax,pA,1000,,
+Imax,pA,2000,,
 dt,ms,0.5,,

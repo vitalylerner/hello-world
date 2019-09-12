@@ -22,6 +22,7 @@ from multiprocessing import Pool,Process
 import time
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 from scipy import integrate
+from ChR2Dynamics import ChR2Dynamics
 
 SEGMENT_LENGTH=8 #micron
 swc_path_base_allen='../AllenCells/SWC/'
@@ -66,9 +67,7 @@ n_points_on_sphere=500 #keep constant
 crd_x,crd_y,crd_z=sphere_equi(n_points_on_sphere)
 
 def soma_integrate_light(r_soma,r_spot,x_spot):
-
     v = exp( - ((r_soma*crd_x-x_spot)**2+(r_soma*crd_y)**2)/(2*r_spot**2) )
-
     return sum(v)*4*pi*r_soma**2/len(v)
 
 """
@@ -618,15 +617,20 @@ class neuron:
         ISI=lstim.seq_params['ISI']
         lst=lstim.seq_params['lst']
         nstim=len(lst)
-        dur_tot=nstim*ISI+dur
+        ChR2=ChR2Dynamics()
+        dur_tot=nstim*ISI+dur+200
+        
         r=lstim.spots_r
         
         #morphology
         Nseg=len(array(self.morph.segments['segment_id']))
+        
+        #Light generation
         L=zeros([Nseg,dur_tot])
         
-        #superimpose light flux from all stimuli
-        for isp,nsp in enumerate(lst):
+        
+        #superimpose light flux from all stimuli spots
+        for isp,nsp in enumerate(lst[:250]):
              cspot={'x':lstim.spots_xy[nsp,0],'y':lstim.spots_xy[nsp,1],'r':r}
              ct=isp*ISI
              fld=self.spot_flux(cspot)
@@ -635,7 +639,17 @@ class neuron:
              tmp=outer(ones([1,dur]),flux).T
              #print 'A',shape(tmp),shape( L[:,ct:ct+dur])
              L[:,ct:ct+dur]+=tmp
-        return L
+             
+        #translate light flux to current for each segment separately
+        dt=ChR2.params['dt']
+        nrep=int(1./dt)
+        L=repeat(L,nrep,axis=1)
+        I=0*L
+        t=arange(shape(L)[1])*dt
+        for iSeg in range(Nseg):
+            l=L[iSeg,:].squeeze()
+            I[iSeg,:]=ChR2.L2I(t,l)
+        return I+10
         #print L
         #matshow(log10(L))
         #show()
@@ -714,17 +728,17 @@ print time.asctime( time.localtime(time.time()) )
 map_params={'r':10,'dr':20,'x0':0,'y0':-570,'N':3}
 lstim=optostim(map_params)
 S=[8,18,16,13,10]
-lstim.assign_seq({'lst':S,'ISI':20,'dur':30})
+lstim.assign_seq({'lst':S,'ISI':5,'dur':12})
 
-L=N[0].apply_optostim(lstim)
+I=N[0].apply_optostim(lstim)
 
 print time.asctime( time.localtime(time.time()) )
 #N[0].morp.draw({
 #N[0].apply_spot({'x':-50,'y':-700,'r':20})
-figure()
-lstim.draw()
-figure()
-matshow(L)
+IM=log10(I+0.1)
+#IM[IM<0]=0
+#IM=IM/IM.max()
+matshow(IM,cmap='hot')
 print time.asctime( time.localtime(time.time()) )
 #axis('equal')
 show()
