@@ -30,6 +30,7 @@ if os.name=='nt':
 else:
     WINDOWS=False
     
+SEGMENT_LENGTH=8 #micron
 class morphology:
     swc=None
     swc0=None
@@ -167,12 +168,26 @@ class morphology:
         if params==None:
             Layout='Segments'
             alpha=0.4
+            linewidth=2
+            override_color=None
         else:
             Layout=params['Layout']
             if 'alpha' in params.keys():
                 alpha=params['alpha']
             else:
                 alpha=0.4
+            if 'override_color'  in params.keys():
+                ov_color=params['override_color']
+                if not ov_color is None:
+                    override=True
+                else:
+                    override=False
+            else:
+                override=False
+            if 'linewidth' in params.keys():
+                linewidth=params['linewidth']
+            else:
+                linewidth=2
     
         swc=self.swc
 
@@ -193,7 +208,10 @@ class morphology:
                 cBr_y=array(cBr_SWC['y'])
                 cBr_z=array(cBr_SWC['z'])
                 cBr_r=array(cBr_SWC['r'])
-                plot(cBr_x,cBr_y,'-',markersize=0.05,linewidth=1,alpha=alpha)
+                if override:
+                    plot(cBr_x,cBr_y,'-',markersize=0.05,linewidth=linewidth,alpha=alpha,color=ov_color)
+                else:
+                    plot(cBr_x,cBr_y,'-',markersize=0.05,linewidth=linewidth,alpha=alpha)
         elif Layout=='Soma':
             soma_CoM,soma_r=self.soma_geometry()
             ax=gca()
@@ -303,6 +321,7 @@ class morphology:
         branch_id=arange(shape(branch_start)[0])
 
         branch_parent_branch=branch_id*0
+        #print branch_starts
         for bID in branch_id:
             bPP=branch_parent_point[bID]
             if bPP==1:

@@ -38,6 +38,7 @@ else:
 
 SEGMENT_LENGTH=8 #micron
 swc_path_base_allen='../AllenCells/SWC/'
+swc_path_base_my=   '../MyCells/SWC/'
 def list_local_cells_allen():
     return [int(fn[:-4]) for fn in os.listdir(swc_path_base_allen)]
     
@@ -105,10 +106,10 @@ class neuron:
         cDType=sp[sp['name']==name]['datatype'].to_string(index=False)
         cValue2=cValue.to_string(index=False)
 
-        if PYTHON==2:
+        if PYTHON==2 and WINDOWS:
             #print "AAAAAA"
             cDType=str(cDType[1:])
-        #print cDType,'real',cmp_str(cDType,'real') 
+        print cDType#,'real'#,cmp_str(cDType,'real') 
         if cDType=='bool':
             cVal=cValue2=='True'
         elif cDType=='real':
@@ -129,8 +130,8 @@ class neuron:
     def assign_morphology(self,M):
         self.morph=M
         
-    def assign_swc(self,swc_path):
-        M=morphology(swc_path)
+    def assign_swc(self,swc_path,Align=True):
+        M=morphology(swc_path,Align)
         self.assign_morphology(M)
         
     def assign_Allen_ID(self,CellID_Allen):
@@ -268,7 +269,17 @@ class neuron:
         #matshow(log10(L))
         #show()
 
+n=neuron(0)
+CellID=201907242
+fSWC=swc_path_base_my+'{}.swc'.format(CellID)
+n.assign_Lerner_ID(CellID)
+n.assign_swc(fSWC,False)
+n.morph.align()
+n.morph.draw({'Layout':'Soma','alpha':0.3,'linewidth':1.5})
+n.morph.draw({'Layout':'Branches','alpha':0.6,'linewidth':1.2,'override_color':[0.3,0.3,0.3]})
 
+
+#n.import_morphology()
 
 """       
 lstCells=list_local_cells_allen()
@@ -287,22 +298,26 @@ for iN,CellID in enumerate(lstCells[:1]):
     #N[iN].morph.soma_geometry()
 
 print (time.asctime( time.localtime(time.time()) ))
-
-map_params={'r':10,'dr':20,'x0':0,'y0':-570,'N':3}
+"""
+CoM,r=n.morph.soma_geometry()
+mp_201907242={'r':40*0.31,'dr':100*0.31,'x0':CoM[0],'y0':CoM[1],'theta':-17./180*pi,'N':5}
+map_params=mp_201907242
 lstim=optostim(map_params)
-S=[8,18,16,13,10]
+S=[31,21,14,7,8]
 lstim.assign_seq({'lst':S,'ISI':5,'dur':12})
+lstim.draw(S)
+#I=N[0].apply_optostim(lstim)
 
-I=N[0].apply_optostim(lstim)
-
-print (time.asctime( time.localtime(time.time()) ))
+#print (time.asctime( time.localtime(time.time()) ))
 #N[0].morp.draw({
 #N[0].apply_spot({'x':-50,'y':-700,'r':20})
-IM=log10(I+0.1)
+#IM=log10(I+0.1)
 #IM[IM<0]=0
 #IM=IM/IM.max()
-matshow(IM,cmap='hot')
-print (time.asctime( time.localtime(time.time()) ))
+#matshow(IM,cmap='hot')
+#print (time.asctime( time.localtime(time.time()) ))
 #axis('equal')
+axis('equal')
+box('off')
 show()
-"""
+
